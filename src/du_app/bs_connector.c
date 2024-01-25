@@ -76,6 +76,7 @@ void sendMetricsXapp(uint32_t ric_req_id) {
   char *payload = NULL;
   int lines_to_read = LINES_TO_READ;
 
+  //printf("[mau][bs_connector] calling get_tx_string\n");
   get_tx_string(&payload, lines_to_read);
 
   if (payload) {
@@ -87,7 +88,7 @@ void sendMetricsXapp(uint32_t ric_req_id) {
 
     // send in chunks, append
     for (int i = 0; i < payload_len; i += MAX_REPORT_PAYLOAD) {
-      memset(chunk, 0, MAX_REPORT_PAYLOAD + 1);
+      memset(chunk, 0, MAX_REPORT_PAYLOAD + 1 + 1);
 
       int offset = 0;
       // add 'm' at the beginning to indicate there are more chunks
@@ -95,8 +96,13 @@ void sendMetricsXapp(uint32_t ric_req_id) {
         strcpy(chunk, "m");
         offset = 1;
       }
-
-      strncpy(chunk + offset, payload + i, MAX_REPORT_PAYLOAD);
+      size_t numcpy_chars = 0;
+      if (payload_len < MAX_REPORT_PAYLOAD){
+        numcpy_chars = payload_len;
+      }else{
+        numcpy_chars = MAX_REPORT_PAYLOAD;
+      }
+      strncpy(chunk + offset, payload + i, numcpy_chars);
 
       BuildAndSendRicIndicationReport(chunk, strlen(chunk), ric_req_id);
     }
