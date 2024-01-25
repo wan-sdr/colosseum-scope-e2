@@ -57,7 +57,7 @@ CCPP        =g++ -m32
 CCPP_LINKER =g++ -m32
 endif
 
-CC1= $(CC)
+CC1= $(CC) -g 
 CCPP1= $(CCPP)
 
 ifeq ($(MODE),TDD)
@@ -263,4 +263,5 @@ odu: prepare_dirs copy_build
 
 #cu_stub: prepare_cu_dirs cu link_cu
 #ric_stub: prepare_ric_dirs ric link_ric
+
 
