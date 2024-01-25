@@ -38,8 +38,8 @@ void readMetricsInteractive(FILE *fp, char (*output_string)[MAX_BUF_SIZE], int m
   float ratio_granted_req_prb;
   char selected_metrics[MAX_BUF_SIZE];
 
-  // only send if sum_requested_prbs > 0 or if prbs are granted anyway
-  if (metrics.sum_requested_prbs > 0 || (metrics.sum_requested_prbs == 0 && metrics.sum_granted_prbs > 0) || CSV_DEBUG) {
+  // we want to send all the time for preset 0 or 2
+  if (metrics.sum_requested_prbs > 0 || (metrics.sum_requested_prbs == 0 && metrics.sum_granted_prbs > 0) || CSV_DEBUG || metrics_preset == 2 || metrics_preset == 0) {
     switch(metrics_preset) {
       case 0:
         sprintf(selected_metrics, "%lu,%d,%llu,%" PRIu16 ","\
@@ -88,6 +88,25 @@ void readMetricsInteractive(FILE *fp, char (*output_string)[MAX_BUF_SIZE], int m
         printf("selected_metrics %s\n", selected_metrics);
 
         break;
+
+      //Initial case for capturing useful metrics for sensing related xApp development
+      //This is currently not working. Somehow it is not reading the correct entries.
+      //This adds overhead, but for now we will just send all metrics (case 0)
+      //We will take care of parsing on the recieve side
+      case 2:
+        sprintf(selected_metrics, "%lu,"\
+          "%.2f,%" PRIu8 ",%" PRIu32 ",%.2lf,%" PRIu16 ",%.2f,%.2f,"\
+          "%.2f,%" PRIu8 ",%" PRIu32 ",%.2lf,%" PRIu16 ",%.2f,%.2f,%" PRIu8 ","\
+          "%" PRIu16 ",%" PRIu16 ","\
+          "%.2f",
+          metrics.timestamp,
+          metrics.dl_mcs, metrics.dl_n_samples, metrics.dl_buffer_bytes, metrics.tx_brate_downlink_Mbps, metrics.tx_pkts_downlink, metrics.tx_errors_downlink_perc, metrics.dl_cqi,
+          metrics.ul_mcs, metrics.ul_n_samples, metrics.ul_buffer_bytes, metrics.rx_brate_downlink_Mbps, metrics.rx_pkts_downlink, metrics.rx_errors_downlink_perc, metrics.ul_sinr, metrics.phr,
+          metrics.sum_requested_prbs, metrics.sum_granted_prbs,
+          metrics.ul_turbo_iters);
+
+        break;
+
       default:
         printf("readMetricsInteractive: Preset %d unknown\n", metrics_preset);
     }
@@ -96,14 +115,29 @@ void readMetricsInteractive(FILE *fp, char (*output_string)[MAX_BUF_SIZE], int m
   strcpy(*output_string, selected_metrics);
 }
 
+void append_uint_to_str(unsigned int num, char* str) {
+    char *temp = calloc(32, sizeof(char));
+    sprintf(temp, "%u", num);
+    strcat(str, temp);
+    free(temp);
+}
 
+void append_string(char **dest, char *src) {
+    size_t dest_len = strlen(*dest);
+    size_t src_len = strlen(src);
+    if (dest_len == 0) {
+        *dest = calloc(src_len + 1, sizeof(char));
+    }else{
+        *dest = realloc(*dest, (dest_len + src_len + 1) * sizeof(char)); // +1 for null-terminator
+    }
+    strcat(*dest, src); //note: strcat adds the null character at the end of the concatenated string
+}
+
+#define BUFSIZE 512
 // read last lines from file
 void readLastMetricsLines(char *file_name, int to_read, char **output_string, int skip_header) {
 
-  FILE *fp;
-  fp = fopen(file_name, "r");
-
-  int max_metrics_buf = 1000;
+  int max_metrics_buf = MAX_BUF_SIZE;
   int min_metrics_to_send = 1;
 
   long unsigned int curr_ts;
@@ -115,129 +149,71 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
     curr_ts = get_time_milliseconds();
   }
 
-  if (!fp) {
-    printf("fp is NULL, filename %s\n", file_name);
-    return;
-  }
-  else {
-    printf("%lu: reading %s\n", curr_ts, file_name);
+  char *cmd_prefix = "/root/radio_code/colosseum-scope-e2/src/du_app/readLastMetrics.o -csv=";
+  char *cmd = (char*) malloc((strlen(cmd_prefix)+1)*sizeof(char));
+  strcpy(cmd, cmd_prefix);
+
+  append_string(&cmd, file_name);
+  append_string(&cmd, " -ltr=");
+  append_uint_to_str((unsigned int) to_read, cmd);
+  printf("[mau] Running cmd %s\n", cmd);
+
+
+  size_t valid_metrics = 0;
+  char buf[BUFSIZE];
+  FILE *p_fp;
+
+  if ((p_fp = popen(cmd, "r")) == NULL) {
+      printf("Error opening pipe!\n");
+      return -1;
   }
 
-  int tot_lines;
-  for (tot_lines = 0; feof(fp) == 0; ++tot_lines) {
-    fscanf(fp, "%*[^\n]\n", NULL);
-  }
-
-  // rewind file pointer
-  rewind(fp);
-
-  // initialize array
-  // + 1 to also account for header
-  int array_len = tot_lines;
-  if (!skip_header) {
-    array_len += 1;
-  }
-  char metrics_array[array_len][max_metrics_buf];
-
-  // skip first lines_num - to_read lines
-  // and read last to_read lines
-  int j = 0;
-  int tot_len = 0;
-  for (int i = 0; i < tot_lines; ++i) {
-    if ((i == 0 && !skip_header) || i >= tot_lines - to_read) {
-      if (i == 0) {
-        fscanf(fp, "%[^\n]\n", metrics_array[j]);
-      }
-      else {
-        readMetricsInteractive(fp, &(metrics_array[j]), METRICS_PRESET);
+  while (fgets(buf, BUFSIZE, p_fp) != NULL) {
+      if (!(strcmp(buf, "\n") == 0)){
+          append_string(output_string, buf);
+          valid_metrics++;
+          printf("--> %s", buf);
       }
 
-      int line_len = strlen(metrics_array[j]);
-      metrics_array[j][line_len] = '\n';
-      metrics_array[j][line_len + 1] = '\0';
-
-      tot_len += strlen(metrics_array[j++]);
-    }
-    else {
-      fscanf(fp, "%*[^\n]\n", NULL);
-    }
   }
 
-  fclose(fp);
-
-  *output_string = (char*) calloc(tot_len + 1, sizeof(char*));
-
-  int curr_pos = 0;
-  int valid_metrics = 0;
-
-  // copy header
-  if (!skip_header) {
-    strcpy(*output_string, metrics_array[0]);
-    curr_pos += strlen(metrics_array[0]);
+  if (strlen(*output_string) > 1){
+    size_t num_chars = strlen(*output_string);
+    (*output_string)[num_chars] = '\0';
   }
 
-  //for (int i = 0; i < to_read + 1; ++i) {
-  for (int i = 0; i < j; ++i) {
-    if (i == 0 && !skip_header) {
-      continue;
-    }
-
-    // get metric timestamp
-    long unsigned int metric_ts = 0;
-    sscanf(metrics_array[i], "%lu", &metric_ts);
-
-    // printf("i %d, timestamp %lu, metrics_array[i] %s\n", i, metric_ts, metrics_array[i]);
-
-    // save it if recent enough
-    if ((curr_ts - metric_ts) / 1000.0 <= DELTA_TS_S) {
-      // skip if empty line
-      if (strcmp(metrics_array[i], "\n") == 0 || strlen(metrics_array[i]) == 0) {
-        continue;
-      }
-
-      // strip timestamp if METRICS_PRESET is 1 or more
-      if (METRICS_PRESET >= 1) {
-        char tmp_ts[100];
-        sprintf(tmp_ts, "%lu", metric_ts);
-        strcat(tmp_ts, ",");
-        remove_substr(metrics_array[i], tmp_ts);
-        // printf("tmp_ts %s\nmetrics_array[i] %s\n", tmp_ts, metrics_array[i]);
-      }
-
-      if (skip_header && valid_metrics == 0) {
-        strcpy(*output_string, metrics_array[i]);
-      }
-      else {
-        //strcat(&(*output_string)[curr_pos], metrics_array[i]);
-        strcat(*output_string + curr_pos, metrics_array[i]);
-      }
-
-      curr_pos += strlen(metrics_array[i]);
-      valid_metrics += 1;
-
-      printf("len metrics_array[i]: %d\n", strlen(metrics_array[i]));
-    }
+  if (pclose(p_fp)) {
+      printf("Command not found or exited with error status\n");
+      return -1;
   }
 
-  printf("valid_metrics %d\noutput_string\n---%s---\n", valid_metrics, output_string);
+  printf("[mau] valid_metrics %d\nTot. Return output: %s \n", valid_metrics, *output_string);
 
+
+  /*
   if (valid_metrics < 1) {
     printf("Freeing inside readLastMetricsLines\n");
-    printf("to_read %d, j %d\n", to_read, j);
-    free(*output_string);
-    *output_string = NULL;
-    printf("Freed\n");
+    if (strlen(*output_string) > 1){
+        free(*output_string);
+        *output_string = NULL;
+        printf("Freed\n");
+    }
   }
+    //the following we don't need it (this is just to resize the buffer if less lines have been read, but in our case is allocated dynamically)
+
   else if (valid_metrics < to_read) {
     printf("Reallocating inside readLastMetricsLines\n");
     // reallocate output_string accordingly
     *output_string = (char*) realloc(*output_string, (strlen(*output_string) + 1) * sizeof(char*));
+    printf("[mau] output_string %d, after realloc %d\n", strlen(*output_string), (strlen(*output_string) + 1));
     printf("Reallocated\n");
   }
+  */
 }
 
 
 // get content of specified directory
+
 int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 
   DIR *ptr;
@@ -267,26 +243,64 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
   return num_el;
 }
 
+/*
+// get content of specified directory
+int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
+
+  DIR *ptr;
+  struct dirent *directory;
+
+  // open the specified directory
+  ptr = opendir(directory_name);
+
+  int num_el = 0;
+  // iterate over each file in the directory
+  while((directory = readdir(ptr)) != NULL) {
+    // extract the substring before the first underscore
+    char tmp_str[MAX_BUF_SIZE];
+    sscanf(directory->d_name, "%*[^_]%*c%[^_]", tmp_str);
+
+    // extract the substring after the first underscore
+    char* token = strtok(NULL, "_");
+    if (token != NULL) {
+      // check whether the remaining substring ends with "metrics.csv"
+      if (strcmp(token, "metrics.csv") == 0) {
+        // if so, add the filename to dir_content
+        strcpy(dir_content[num_el++], directory->d_name);
+      }
+    }
+  }
+
+  // close the directory
+  closedir(ptr);
+
+  // return the number of matching files found
+  return num_el;
+}
+*/
+
 
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
 
   int curr_pos = 0;
-
-  char dir_content[1000][MAX_BUF_SIZE];
+  /*
+  char dir_content[1][MAX_BUF_SIZE];
   int dir_el;
   dir_el = getDirContent(METRICS_DIR, dir_content);
-
-  char *metrics_string = NULL;
+  */
+  int dir_el = 1;
+  char *dir_content = "1010123456002_metrics.csv";
+  char *metrics_string = "";
   for (int i = 0; i < dir_el; ++i) {
     // assemble path of file to read
-    char file_path[1000] = METRICS_DIR;
-    strcat(file_path, dir_content[i]);
+    char file_path[MAX_BUF_SIZE] = METRICS_DIR;
+    strcat(file_path, dir_content);
 
     // read metrics, always skip header
     readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
 
-    if (metrics_string) {
+    if (strlen(metrics_string) > 1) {
       int metrics_size = strlen(metrics_string);
 
       if (!(*send_metrics)) {
@@ -338,7 +352,7 @@ void remove_substr (char *string, char *sub) {
 int csv_tester(void) {
 
   char *send_metrics = NULL;
-  int lines_to_read = 2;
+  int lines_to_read = 1; // 2 (original value)
 
   get_tx_string(&send_metrics, lines_to_read);
 

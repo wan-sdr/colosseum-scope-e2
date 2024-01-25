@@ -6,7 +6,7 @@
 #define MAX_REPORT_PAYLOAD 300
 // #define METRICS_DIR "./"
 #define METRICS_DIR "/root/radio_code/scope_config/metrics/csv/"
-#define METRICS_PRESET 1
+#define METRICS_PRESET 0
 #define CSV_DEBUG 0
 
 // metrics structure
