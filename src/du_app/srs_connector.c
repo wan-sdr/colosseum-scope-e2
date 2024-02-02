@@ -11,6 +11,7 @@ void write_slice_assignment(char* new_assignment) {
   char filename[1000];
   strcpy(filename, CONFIG_PATH);
   strcat(filename, SLICE_ASSIGNMENT_FILENAME);
+  printf("%s\n", filename);
 
   FILE *file = fopen(filename, "r");
 
@@ -29,28 +30,36 @@ void write_slice_assignment(char* new_assignment) {
   const char config_delimiter[3] = "::";
   const char default_ue_slice[2] = "0";
 
+  printf("tokenize message: %s\n", new_assignment);
   // copy new_assignment so that it can be modified
   char *assignment = strdup(new_assignment);
 
   // get UE IMSI and new UE slice ID as integers from assignment string
-  int ue_imsi, ue_slice;
+//  int ue_imsi, ue_slice;
 
-  char *token = strtok(assignment, config_delimiter);
-  sscanf(token, "%d", &ue_imsi);
+  char *ue_imsi = strtok(assignment, config_delimiter);
+//  sscanf(token, "%d", &ue_imsi);
 
-  token = strtok(NULL, config_delimiter);
-  sscanf(token, "%d", &ue_slice);
-
+  char *ue_slice = strtok(NULL, config_delimiter);
+//  sscanf(token, "%d", &ue_slice);
+    printf("ue_imsi:%s\n", ue_imsi);
+    printf("ue_slice:%s\n", ue_slice);
   // read file line by line to replace the line with the matching IMSI
   char buffer[MAX_LINE_LENGTH];
   int updated = 0;
-  int line_ue_imsi, line_ue_slice;
+  char line_ue_imsi[1000];
+  char line_ue_slice[1000];
+
 
   while (fgets(buffer, MAX_LINE_LENGTH, file) != NULL) {
-
-      if (sscanf(buffer, "%d::%d", &line_ue_imsi, &line_ue_slice) == 2) {
-          if (line_ue_imsi == ue_imsi) {
-              fprintf(tempFile, "%d::%d\n", ue_imsi, ue_slice);
+//      printf("buffer: %s\n", buffer);
+      int scanf_code = sscanf(buffer, "%[^:]::%[^\n]", line_ue_imsi, line_ue_slice);
+//      printf("scanf_code: %d\n", scanf_code);
+//      printf("line_ue_imsi: %s\n", line_ue_imsi);
+//      printf("line_ue_slice: %s\n", line_ue_slice);
+      if (scanf_code == 2) {
+          if (strcmp(line_ue_imsi, ue_imsi) == 0) {
+              fprintf(tempFile, "%s::%s\n", ue_imsi, ue_slice);
               updated = 1;
           } else {
               fprintf(tempFile, "%s", buffer);
@@ -311,10 +320,10 @@ void printf_neat(char* msg, char* dbg_str) {
 
 
 // tester function
-int tester(void) {
+int main(void) {
 
-  uint8_t* msg = "1,0,1\n4,5,7\n";
-  uint8_t* msg2 = "\n10,5,4";
+  char *msg = "1,0,1\n4,5,7\n001010123456002::3";
+//  uint8_t* msg2 = "\n10,5,4";
 
   // write_scheduling_policy((char*) msg);
   write_control_policies((char*) msg);
