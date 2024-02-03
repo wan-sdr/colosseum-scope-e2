@@ -320,7 +320,7 @@ void printf_neat(char* msg, char* dbg_str) {
 
 
 // tester function
-int main(void) {
+int tester(void) {
 
   char *msg = "1,0,1\n4,5,7\n001010123456002::3";
 //  uint8_t* msg2 = "\n10,5,4";
