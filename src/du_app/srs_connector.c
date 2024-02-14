@@ -3,6 +3,7 @@
 char last_scheduling_policy[256] = { '\0' };
 char last_slicing_policy[256] = { '\0' };
 char last_slice_assignment[256] = { '\0' };
+char last_mcs_control[256] = { '\0' };
 
 // write UE slice assignment on config file
 void write_slice_assignment(char* new_assignment) {
@@ -80,6 +81,86 @@ void write_slice_assignment(char* new_assignment) {
       remove(filename);         // Delete the original file
       rename("tempfile.txt", filename); // Rename the temporary file to the original file
       printf("File updated successfully.\n");
+  }
+}
+
+// TODO: Test this function
+//write UE MCS control to config file
+void write_mcs_control(char* new_mcs) {
+
+  // form filename
+  char filename[1000];
+  strcpy(filename, CONFIG_PATH);
+  strcat(filename, MCS_CONTROL_FILENAME);
+  printf("%s\n", filename);
+
+  FILE *file = fopen(filename, "r");
+
+
+  if (file == NULL) {
+    perror("Error opening the file");
+    exit(1);
+  }
+
+  FILE *tempFile = fopen("tempfile.txt", "w");
+  if (tempFile == NULL) {
+    perror("Error creating a temporary file");
+    exit(1);
+  }
+
+  const char config_delimiter[3] = "::";
+  const char default_ue_mcs[2] = "0";
+
+  printf("tokenize message: %s\n", new_mcs);
+  // copy new_assignment so that it can be modified
+  char *mcs = strdup(new_mcs);
+
+  // get UE IMSI and new UE slice ID as integers from assignment string
+//  int ue_imsi, ue_slice;
+
+  char *ue_imsi = strtok(mcs, config_delimiter);
+//  sscanf(token, "%d", &ue_imsi);
+
+  char *ue_mcs = strtok(NULL, config_delimiter);
+//  sscanf(token, "%d", &ue_slice);
+  printf("ue_imsi:%s\n", ue_imsi);
+  printf("ue_mcs:%s\n", ue_mcs);
+  // read file line by line to replace the line with the matching IMSI
+  char buffer[MAX_LINE_LENGTH];
+  int updated = 0;
+  char line_ue_imsi[1000];
+  char line_ue_mcs[1000];
+
+
+  while (fgets(buffer, MAX_LINE_LENGTH, file) != NULL) {
+//      printf("buffer: %s\n", buffer);
+    int scanf_code = sscanf(buffer, "%[^:]::%[^\n]", line_ue_imsi, line_ue_mcs);
+//      printf("scanf_code: %d\n", scanf_code);
+//      printf("line_ue_imsi: %s\n", line_ue_imsi);
+//      printf("line_ue_mcs: %s\n", line_ue_mcs);
+    if (scanf_code == 2) {
+      if (strcmp(line_ue_imsi, ue_imsi) == 0) {
+        fprintf(tempFile, "%s::%s\n", ue_imsi, ue_mcs);
+        updated = 1;
+      } else {
+        fprintf(tempFile, "%s", buffer);
+      }
+    } else {
+      // If the line doesn't match the expected format, copy it as is
+      fprintf(tempFile, "%s", buffer);
+    }
+  }
+
+  fclose(file);
+  fclose(tempFile);
+
+  if (!updated) {
+    printf("UE IMSI requested not found in the file.\n");
+    remove("tempfile.txt"); // Delete the temporary file if no update occurred
+  } else {
+    remove(filename);         // Delete the original file
+    rename("tempfile.txt", filename); // Rename the temporary file to the original file
+    printf("File updated successfully.\n");
   }
 }
 
@@ -224,15 +305,18 @@ void write_slicing_policy(char* new_policy) {
 
 
 // receive agent control and write it on config files
-// expected control looks like: '1,0,0\n5,10,3\n001010123456002::0' --> scheduling on first, slicing on second line, UE slice assignment on third line <imsi>::<slice ID>
+// expected control looks like: '1,0,0\n5,10,3\n001010123456002::0\n001010123456002::0'
+// --> scheduling on first, slicing on second line,
+// UE slice assignment on third line <imsi>::<slice ID>, UE MCS assignment on fourth line, <imsi>::<MCS ID>
 void write_control_policies(char* control_msg) {
 
   // copy control message so it can be modified
   char *control = strdup(control_msg);
-  
-  char* scheduling_control = NULL;
-  char* slicing_control = NULL;
-  char* slice_assignment_control = NULL;
+
+  char *scheduling_control = NULL;
+  char *slicing_control = NULL;
+  char *slice_assignment_control = NULL;
+  char *mcs_control = NULL;
 
   // printf_neat("Received control message: ", control);
   printf_neat("Received control message: ", control);
@@ -241,28 +325,42 @@ void write_control_policies(char* control_msg) {
   // divide scheduling and slicing control
   if (control[0] == '\n') {
     slicing_control = strtok(control, "\n");
-  }
-  else {
+  } else {
     scheduling_control = strtok(control, "\n");
     slicing_control = strtok(NULL, "\n");
     slice_assignment_control = strtok(NULL, "\n");
+    mcs_control = strtok(NULL, "\n");
   }
 
   //write slice assignment control
   if (slice_assignment_control) {
     if (strcmp(slice_assignment_control, last_slice_assignment) == 0) {
       printf("Slice assignments are the same as last ones\n");
-    }
-    else {
+    } else {
       printf_neat("Writing new slice assignments on config file ", slice_assignment_control);
       write_slice_assignment(slice_assignment_control);
 
       // update last policy
       strcpy(last_slice_assignment, slice_assignment_control);
     }
-  }
-  else {
+  } else {
     printf("No slice assignment control received\n");
+  }
+
+  //TODO: Test this code
+  //write mcs control
+  if (mcs_control) {
+    if (strcmp(mcs_control, last_mcs_control) == 0) {
+      printf("MCS assignments are the same as last ones\n");
+    } else {
+      printf_neat("Writing new MCS assignments on config file ", mcs_control);
+      write_mcs_control(mcs_control);
+
+      // update last policy
+      strcpy(last_mcs_control, mcs_control);
+    }
+  } else {
+    printf("No MCS control received\n");
   }
 
 
@@ -322,7 +420,7 @@ void printf_neat(char* msg, char* dbg_str) {
 // tester function
 int tester(void) {
 
-  char *msg = "1,0,1\n4,5,7\n001010123456002::3";
+  char *msg = "1,0,1\n4,5,7\n001010123456002::3\n001010123456002::2";
 //  uint8_t* msg2 = "\n10,5,4";
 
   // write_scheduling_policy((char*) msg);
