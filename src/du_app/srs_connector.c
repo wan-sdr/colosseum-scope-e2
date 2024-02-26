@@ -385,7 +385,7 @@ void printf_neat(char* msg, char* dbg_str) {
 }
 
 // tester function
-int main(int argc, char *argv[]) {
+int tester(int argc, char *argv[]) {
 
   // Check if at least one command line argument is provided
   int test_num = 4;
