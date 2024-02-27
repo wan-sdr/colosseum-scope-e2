@@ -15,8 +15,8 @@
 // max length of config file name
 #define CONFIG_FILENAME_LEN 1000
 
-//#define CONFIG_PATH "/root/radio_code/scope_config/slicing/"
-#define CONFIG_PATH "/home/orantestbed/ntia_demo/srs_connector/scope_config/slicing/"
+#define CONFIG_PATH "/root/radio_code/scope_config/slicing/"
+//#define CONFIG_PATH "/home/orantestbed/ntia_demo/srs_connector/scope_config/slicing/"
 #define SCHEDULING_POLICY_FILENAME "slice_scheduling_policy.txt"
 #define ALLOCATION_POLICY_FILENAME_BASE "slice_allocation_mask_tenant_"
 #define SLICE_POLICY_FILENAME "ue_imsi_slice.txt"
