@@ -284,13 +284,13 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 void get_tx_string(char **send_metrics, int lines_to_read) {
 
   int curr_pos = 0;
-  /*
+
   char dir_content[1][MAX_BUF_SIZE];
   int dir_el;
   dir_el = getDirContent(METRICS_DIR, dir_content);
-  */
-  int dir_el = 1;
-  char *dir_content = "1010123456002_metrics.csv";
+
+  // int dir_el = 1;
+  // char *dir_content = "1010123456002_metrics.csv";
   char *metrics_string = "";
   for (int i = 0; i < dir_el; ++i) {
     // assemble path of file to read
