@@ -282,45 +282,38 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
+    int curr_pos = 0;
+    char metrics_string[1024]; // Buffer to hold metrics temporarily
+    *send_metrics = NULL; // Initialize send_metrics to NULL at the start
 
-  int curr_pos = 0;
+    // Iterate through each file from 1010123456002_metrics.csv to 1010123456011_metrics.csv
+    for (int i = 2; i <= 11; ++i) {
+        char file_path[MAX_BUF_SIZE] = METRICS_DIR;
+        char file_name[MAX_BUF_SIZE];
 
-  char dir_content[1][MAX_BUF_SIZE];
-  int dir_el;
-  dir_el = getDirContent(METRICS_DIR, dir_content);
+        // Generate the file name dynamically, e.g., 1010123456002_metrics.csv
+        snprintf(file_name, MAX_BUF_SIZE, "10101234560%02d_metrics.csv", i);
+        strcat(file_path, file_name); // Construct the full file path
 
-  // int dir_el = 1;
-  // char *dir_content = "1010123456002_metrics.csv";
-  char *metrics_string = "";
-  for (int i = 0; i < dir_el; ++i) {
-    // assemble path of file to read
-    char file_path[MAX_BUF_SIZE] = METRICS_DIR;
-    strcat(file_path, dir_content);
+        // Read metrics from the file, always skipping the header
+        readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
 
-    // read metrics, always skip header
-    readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
+        if (strlen(metrics_string) > 0) { // Check if any data was read
+            int metrics_size = strlen(metrics_string);
 
-    if (strlen(metrics_string) > 1) {
-      int metrics_size = strlen(metrics_string);
+            if (!(*send_metrics)) {
+                *send_metrics = (char *)calloc(metrics_size + 1, sizeof(char)); // Allocate memory
+                strcpy(*send_metrics, metrics_string); // Copy initial data
+            } else {
+                *send_metrics = (char *)realloc(*send_metrics, (strlen(*send_metrics) + metrics_size + 1) * sizeof(char)); // Reallocate
+                strcat(*send_metrics, metrics_string); // Append new data
+            }
 
-      if (!(*send_metrics)) {
-        *send_metrics = (char*) calloc(metrics_size, sizeof(char*));
-        strcpy(*send_metrics, metrics_string);
-      }
-      else {
-        *send_metrics = (char*) realloc(*send_metrics, (strlen(*send_metrics) + metrics_size) * sizeof(char*));
-        memset(*send_metrics + curr_pos, '\0', metrics_size * sizeof(char*));
-
-        strcat(*send_metrics, metrics_string);
-      }
-
-      curr_pos += metrics_size;
-
-      free(metrics_string);
-      metrics_string = NULL;
+            curr_pos += metrics_size; // Update current position
+        }
     }
-  }
 }
+
 
 
 // return current time in milliseconds since the EPOCH
