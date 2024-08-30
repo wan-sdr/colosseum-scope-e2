@@ -283,7 +283,7 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
     int curr_pos = 0;
-    int num_files_to_read = 2; // Number of files to read
+    int num_files_to_read = 10; // Number of files to read
     int start_index = 2; // Starting index for file names
 
     char file_name[MAX_BUF_SIZE];
