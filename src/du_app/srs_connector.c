@@ -1,83 +1,13 @@
 #include "srs_connector.h"
 
-char last_scheduling_policy[256] = { '\0' };
-char last_slicing_policy[256] = { '\0' };
-char last_slice_assignment[256] = { '\0' };
 
-// write UE slice assignment on config file
-void write_slice_assignment(char* new_assignment) {
+char last_scheduling_policy[POLICY_LEN] = { '\0' };
+char last_allocation_policy[POLICY_LEN] = { '\0' };
+char last_slice_policy[POLICY_LEN] = { '\0' };
+char last_mcs_policy[POLICY_LEN] = { '\0' };
+char last_gain_policy[POLICY_LEN] = { '\0' };
 
-  // form filename
-  char filename[1000];
-  strcpy(filename, CONFIG_PATH);
-  strcat(filename, SLICE_ASSIGNMENT_FILENAME);
-
-  FILE *file = fopen(filename, "r");
-
-
-  if (file == NULL) {
-      perror("Error opening the file");
-      exit(1);
-  }
-
-  FILE *tempFile = fopen("tempfile.txt", "w");
-  if (tempFile == NULL) {
-      perror("Error creating a temporary file");
-      exit(1);
-  }
-
-  const char config_delimiter[3] = "::";
-  const char default_ue_slice[2] = "0";
-
-  // copy new_assignment so that it can be modified
-  char *assignment = strdup(new_assignment);
-
-  // get UE IMSI and new UE slice ID as integers from assignment string
-  int ue_imsi, ue_slice;
-
-  char *token = strtok(assignment, config_delimiter);
-  sscanf(token, "%d", &ue_imsi);
-
-  token = strtok(NULL, config_delimiter);
-  sscanf(token, "%d", &ue_slice);
-
-  // read file line by line to replace the line with the matching IMSI
-  char buffer[MAX_LINE_LENGTH];
-  int updated = 0;
-  int line_ue_imsi, line_ue_slice;
-
-  while (fgets(buffer, MAX_LINE_LENGTH, file) != NULL) {
-
-      if (sscanf(buffer, "%d::%d", &line_ue_imsi, &line_ue_slice) == 2) {
-          if (line_ue_imsi == ue_imsi) {
-              fprintf(tempFile, "%d::%d\n", ue_imsi, ue_slice);
-              updated = 1;
-          } else {
-              fprintf(tempFile, "%s", buffer);
-          }
-      } else {
-          // If the line doesn't match the expected format, copy it as is
-          fprintf(tempFile, "%s", buffer);
-      }
-  }
-
-  fclose(file);
-  fclose(tempFile);
-
-  if (!updated) {
-      printf("UE IMSI requested not found in the file.\n");
-      remove("tempfile.txt"); // Delete the temporary file if no update occurred
-  } else {
-      remove(filename);         // Delete the original file
-      rename("tempfile.txt", filename); // Rename the temporary file to the original file
-      printf("File updated successfully.\n");
-  }
-}
-
-
-// write scheduling policies on config file
-void write_scheduling_policy(char* new_policy) {
-
+void write_scheduling_policy(char* new_scheduler) {
   FILE *fp;
   char filename[1000];
   char* file_header = "# slice::scheduling policy\n"
@@ -91,10 +21,12 @@ void write_scheduling_policy(char* new_policy) {
 
   // form filename
   strcpy(filename, CONFIG_PATH);
-  strcat(filename, SCHEDULING_FILENAME);
+  strcat(filename, SCHEDULING_POLICY_FILENAME);
 
-  // copy new_policy so that it can be modified
-  char *policies = strdup(new_policy);
+  // copy new_scheduler so that it can be modified
+  char* scheduler_policies = strdup(new_scheduler);
+
+  printf("Writing scheduler policy: %s\n", new_scheduler);
 
   fp = fopen(filename, "w+");
 
@@ -107,7 +39,7 @@ void write_scheduling_policy(char* new_policy) {
   fprintf(fp, "%s\n", file_header);
 
   // get first policy
-  slice_policy = strtok(policies, policies_delimiter);
+  slice_policy = strtok(scheduler_policies, policies_delimiter);
 
   for (int i = 0; i < SLICE_NUM; ++i) {
     if (slice_policy != NULL) {
@@ -122,32 +54,31 @@ void write_scheduling_policy(char* new_policy) {
   }
 
   // save policy
-  strcpy(last_scheduling_policy, new_policy);
+  strcpy(last_scheduling_policy, new_scheduler);
 
   fclose(fp);
+  printf("Scheduler policy written to file: %s\n", filename);
 }
 
-
-// write slicing policy on config file
-void write_slicing_policy(char* new_policy) {
-
+void write_allocation_policy(char* new_allocation){
   FILE *fp;
-  char base_filename[1000];
-
+  char base_filename[CONFIG_FILENAME_LEN];
   const int rbg_num = 25;
   const char policies_delimiter[2] = ",";
 
-  // copy control message so it can be modified
-  char *policies = strdup(new_policy);
-
   // form filename
   strcpy(base_filename, CONFIG_PATH);
-  strcat(base_filename, SLICING_BASE_FILENAME);
+  strcat(base_filename, ALLOCATION_POLICY_FILENAME_BASE);
+
+  // copy new_allocation so that it can be modified
+  char* allocation_policies = strdup(new_allocation);
+
+  printf("Writing allocation policy: %s\n", new_allocation);
 
   // count how many policies were received
   int p_num = 0;
-  for (int i = 0; i < strlen(new_policy); ++i) {
-    if (new_policy[i] == policies_delimiter[0]) {
+  for (int i = 0; i < strlen(new_allocation); ++i) {
+    if (new_allocation[i] == policies_delimiter[0]) {
       p_num++;
     }
   }
@@ -162,7 +93,7 @@ void write_slicing_policy(char* new_policy) {
     char slice_num[2];
     sprintf(slice_num, "%d", s_idx);
 
-    char filename[1000];
+    char filename[CONFIG_FILENAME_LEN];
     strcpy(filename, base_filename);
     strcat(filename, slice_num);
     strcat(filename, ".txt");
@@ -170,7 +101,7 @@ void write_slicing_policy(char* new_policy) {
     // get current slicing policy
     char* rbg_policy_str = NULL;
     if (s_idx == 0) {
-      rbg_policy_str = strtok(policies, policies_delimiter);
+      rbg_policy_str = strtok(allocation_policies, policies_delimiter);
     }
     else {
       rbg_policy_str = strtok(NULL, policies_delimiter);
@@ -210,114 +141,275 @@ void write_slicing_policy(char* new_policy) {
 
     fprintf(fp, "%s", slicing_mask);
     fclose(fp);
+    printf("Allocation policy written to file: %s\n", filename);
+  }
+  strcpy(last_allocation_policy, new_allocation);
+}
+
+void write_slice_policy(char* new_slice) {
+  FILE *fp;
+  char filename[CONFIG_FILENAME_LEN];
+  const char policies_delimiter[2] = ",";
+  const char config_delimiter[3] = "::";
+  const char default_policy[2] = "0";
+
+  // form filename
+  strcpy(filename, CONFIG_PATH);
+  strcat(filename, SLICE_POLICY_FILENAME);
+
+  // copy new_slice so that it can be modified
+  char* slice_policies = strdup(new_slice);
+
+
+
+  printf("Writing slice policy: %s\n", new_slice);
+
+  // open config file for reading and writing
+  fp = fopen(filename, "r+");
+
+  if (fp == NULL) {
+    printf("ERROR: file pointer is NULL\n");
+    return;
+  }
+
+  // TODO: Loop through multiple slice policies, replace strdup with strtok to tokenize each slice policy
+  char *slice_policy = strdup(slice_policies);
+
+  // Tokenize UE IMSI and UE slice
+  char *ue_imsi = strtok(slice_policy, config_delimiter);
+  char *ue_slice = strtok(NULL, config_delimiter);
+
+  char *imsi = strdup(ue_imsi);
+  char *new_policy = strdup(ue_slice);
+
+  int success = write_imsi_line(fp, ue_imsi, ue_slice);
+  if (success == 1) {
+    // save slice policy
+    strcpy(last_slice_policy, new_slice);
+    printf("Slice policy written to file: %s\n", filename);
+  } else if (success == 0) {
+    printf("Failed to write slice policy to file: UE IMSI requested not found in the file.\n");
+  } else {
+    printf("Failed to write slice policy to file: an error occurred.\n");
   }
 }
 
+void write_mcs_policy(char* new_mcs) {
+  FILE *fp;
+  char filename[CONFIG_FILENAME_LEN];
+  const char policies_delimiter[2] = ",";
+  const char config_delimiter[3] = "::";
+  const char default_policy[2] = "0";
 
-// receive agent control and write it on config files
-// expected control looks like: '1,0,0\n5,10,3\n001010123456002::0' --> scheduling on first, slicing on second line, UE slice assignment on third line <imsi>::<slice ID>
+  // form filename
+  strcpy(filename, CONFIG_PATH);
+  strcat(filename, MCS_POLICY_FILENAME);
+
+  // copy new_mcs so that it can be modified
+  char* mcs_policies = strdup(new_mcs);
+
+
+
+  printf("Writing MCS policy: %s\n", new_mcs);
+
+  // open config file for reading and writing
+  fp = fopen(filename, "r+");
+
+  if (fp == NULL) {
+    printf("ERROR: file pointer is NULL\n");
+    return;
+  }
+
+  // TODO: Loop through multiple MCS policies, replace strdup with strtok to tokenize each MCS policy
+  char *mcs_policy = strdup(mcs_policies);
+
+  // Tokenize UE IMSI and UE MCS
+  char *ue_imsi = strtok(mcs_policy, config_delimiter);
+  char *ue_mcs = strtok(NULL, config_delimiter);
+
+  char *imsi = strdup(ue_imsi);
+  char *new_policy = strdup(ue_mcs);
+
+  int success = write_imsi_line(fp, ue_imsi, ue_mcs);
+  if (success == 1) {
+    // save mcs policy
+    strcpy(last_mcs_policy, new_mcs);
+    printf("MCS policy written to file: %s\n", filename);
+  } else if (success == 0) {
+    printf("Failed to write MCS policy to file: UE IMSI requested not found in the file.\n");
+  } else {
+    printf("Failed to write MCS policy to file: an error occurred.\n");
+  }
+}
+
+void write_gain_policy(char* new_gain) {
+  FILE *fp;
+  char filename[CONFIG_FILENAME_LEN];
+
+  // form filename
+  strcpy(filename, CONFIG_PATH);
+  strcat(filename, GAIN_POLICY_FILENAME);
+
+  // copy new_gain so that it can be modified
+  char* gain = strdup(new_gain);
+
+  printf("Writing gain policy: %s\n", new_gain);
+  // open gain config file for writing
+  fp = fopen(filename, "w+");
+
+  // check for fopen success
+  if (fp == NULL) {
+    printf("ERROR: could not open file (%s)\n", filename);
+    return;
+  }
+
+  // write gain policy to file
+  if (fprintf(fp, "%s\n", gain) < 0){
+    printf("ERROR: could not write gain policy (%s)\n", gain);
+    return;
+  }
+
+  // save gain policy
+  strcpy(last_gain_policy, gain);
+
+  // close file
+  fclose(fp);
+  printf("Gain policy written to file: %s\n", filename);
+}
+
 void write_control_policies(char* control_msg) {
 
-  // copy control message so it can be modified
+  // copy RIC control message so it can be modified
   char *control = strdup(control_msg);
-  
-  char* scheduling_control = NULL;
-  char* slicing_control = NULL;
-  char* slice_assignment_control = NULL;
+  // Declare and initialize an array of functions
+  void (*func_array[]) (char *) = {write_scheduling_policy,
+                                    write_allocation_policy,
+                                    write_slice_policy,
+                                    write_mcs_policy,
+                                    write_gain_policy };
+  // Declare and initialize an array of last policies
+  char *last_policy_array[] = {last_scheduling_policy,
+                     last_allocation_policy,
+                     last_slice_policy,
+                     last_mcs_policy,
+                     last_gain_policy };
+  // Declare an array of new policies
+  char *new_policy_array[5];
+  // print RIC control message
+  printf_neat("\n==========Received RIC control message=========\n", control);
 
-  // printf_neat("Received control message: ", control);
-  printf_neat("Received control message: ", control);
-
-
-  // divide scheduling and slicing control
-  if (control[0] == '\n') {
-    slicing_control = strtok(control, "\n");
+  // tokenize RIC control message into policy strings
+  //printf("\nWriting policies to config files...\n");
+  char* policy = strtok(control, "\n");
+  for (int i =0; policy != NULL; i++) {
+    new_policy_array[i] = policy;
+    // printf("%s\n", policy);
+    policy = strtok(NULL, "\n");
   }
-  else {
-    scheduling_control = strtok(control, "\n");
-    slicing_control = strtok(NULL, "\n");
-    slice_assignment_control = strtok(NULL, "\n");
-  }
 
-  //write slice assignment control
-  if (slice_assignment_control) {
-    if (strcmp(slice_assignment_control, last_slice_assignment) == 0) {
-      printf("Slice assignments are the same as last ones\n");
+  // Iterate through all policy functions or until no tokens left in control message
+  for (int i=0; i <= 4; i++) {
+    // If policy exists and different from last policy, write new policy
+    if (strcmp(new_policy_array[i], last_policy_array[i]) == 0) {
+      printf( "New policy is the same as last policy: %s, %s\n", new_policy_array[i], last_policy_array[i]);
+    } else if (new_policy_array[i] == NULL){
+      // TODO: cannot tokenize a NULL string between \n\n
+      printf("Skipping NULL policy\n");
+    } else {
+      printf("\n");
+      func_array[i](new_policy_array[i]);
     }
-    else {
-      printf_neat("Writing new slice assignments on config file ", slice_assignment_control);
-      write_slice_assignment(slice_assignment_control);
-
-      // update last policy
-      strcpy(last_slice_assignment, slice_assignment_control);
-    }
-  }
-  else {
-    printf("No slice assignment control received\n");
-  }
-
-
-  // write scheduling control
-  if (scheduling_control) {
-    if (strcmp(scheduling_control, last_scheduling_policy) == 0) {
-      printf("Scheduling policies are the same as last ones\n");
-    }
-    else {
-      printf_neat("Writing new scheduling policies on config file ", scheduling_control);
-      write_scheduling_policy(scheduling_control);
-
-      // update last policy
-      strcpy(last_scheduling_policy, scheduling_control);
-    }
-  }
-  else {
-    printf("No scheduling control received\n");
-  }
-
-  // write slicing control
-  if (slicing_control) {
-    if (strcmp(slicing_control, last_slicing_policy) == 0) {
-      printf("Slicing policies are the same as last ones\n");
-    }
-    else{
-      printf_neat("Writing new slicing policies on config file ", slicing_control);
-      write_slicing_policy(slicing_control);
-
-      // update last policy
-      strcpy(last_slicing_policy, slicing_control);
-    }
-  }
-  else {
-    printf("No slicing control received\n");
   }
 }
+
+int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
+
+  // read file line by line to replace the line with the matching IMSI
+  char buffer[IMSI_LINE_LENGTH];
+  int updated = 0;
+  char line_imsi[IMSI_LINE_LENGTH];
+  char line_policy[IMSI_LINE_LENGTH];
+
+  while (fgets(buffer, IMSI_LINE_LENGTH , fp) != NULL) {
+
+    // dynamically allocate memory for the actual string length in buffer
+    int line_len = strlen(buffer);
+    char *line = (char *)malloc((line_len+1) * sizeof(char));
+
+    // Check if memory allocation was successful
+    if (line == NULL) {
+      fprintf(stderr, "Memory allocation failed\n");
+      return 0;
+    }
+
+    // copy number of chars specified the dynamically determined length
+    strncpy(line, buffer, line_len);
+    // null terminate string
+    line[line_len] = '\0';
+
+    // Set file offset position for line write
+    fseek(fp, -line_len, SEEK_CUR);
+    int sscanf_code = sscanf(line, "%[^:]::%[^\n]", line_imsi, line_policy);
+    if (sscanf_code == 2) {
+      if (strcmp(line_imsi, imsi) == 0) {
+        fprintf(fp, "%s::%s", imsi, new_policy);
+        updated = 1;
+      } else {
+        fprintf(fp, "%s", line);
+      }
+    } else {
+    // If the line doesn't match the expected format, copy it as is
+      fprintf(fp, "%s", line);
+    }
+    free(line);
+  }
+  return updated;
+}
+
 
 // debug print: print \n literally
 void printf_neat(char* msg, char* dbg_str) {
 
-    printf("%s", msg);
+  printf("%s", msg);
 
-    for (int i = 0; i < strlen(dbg_str); ++i) {
-      if (dbg_str[i] == '\n') {
-        printf("\\n");
-      }
-      else {
-        printf("%c", dbg_str[i]);
-      }
+  for (int i = 0; i < strlen(dbg_str); ++i) {
+    if (dbg_str[i] == '\n') {
+      printf("\\n");
     }
+    else {
+      printf("%c", dbg_str[i]);
+    }
+  }
 
-    printf("\n");
+  printf("\n");
 }
 
-
 // tester function
-int tester(void) {
+int tester(int argc, char *argv[]) {
 
-  uint8_t* msg = "1,0,1\n4,5,7\n";
-  uint8_t* msg2 = "\n10,5,4";
+  // Check if at least one command line argument is provided
+  int test_num = 4;
+  char *messages[] = {"1,0,1\n5,10,35\n001010123456001::2\n001010123456001::0\n80",
+                     "1,2,0\n15,15,20\n001010123456001::0\n001010123456001::3\n70",
+                     "1,2,0\n15,15,20\n001010123456001::0\n001010123456001::3\n70",
+//                     "\n5,10,35\n001010123456001::2\n001010123456001::0\n80",
+//                     "\n\n001010123456001::2\n001010123456001::0\n80",
+//                     "\n\n\n\n",
+//                     "1,0,1\n5,10,35\n001010123456001::2\n001010123456001::0\n",
+//                     "1,0,1\n5,10,35\n001010123456001::2\n001010123456001::0",
+                     "1,0,1\n5,10,35\n001010123456001::2\n001010123456001::0\n80"
+                     };
 
-  // write_scheduling_policy((char*) msg);
-  write_control_policies((char*) msg);
+  char msg[256];
+  if (argc >= 2) {
+    strcpy(msg, argv[1]);
+  }
+
+  for (int i = 0; i < 8; i++) {
+    strcpy(msg, messages[i]);
+    write_control_policies(msg);
+  }
+
 
   return 0;
 }
