@@ -100,7 +100,7 @@ std::string readLastMetricsLines(const char *file_name, int to_read, int skip_he
 
   int tot_lines;
   for (tot_lines = 0; feof(fp) == 0; ++tot_lines) {
-    fscanf(fp, "%*[^\n]\n", NULL);
+    fscanf(fp, "%*[^\n]\n");
   }
 
   // rewind file pointer

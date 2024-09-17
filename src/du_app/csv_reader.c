@@ -282,45 +282,75 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
+    int curr_pos = 0;
+    int num_files_to_read = 10; // Number of files to read
+    int start_index = 2; // Starting index for file names
 
-  int curr_pos = 0;
-  /*
-  char dir_content[1][MAX_BUF_SIZE];
-  int dir_el;
-  dir_el = getDirContent(METRICS_DIR, dir_content);
-  */
-  int dir_el = 1;
-  char *dir_content = "1010123456002_metrics.csv";
-  char *metrics_string = "";
-  for (int i = 0; i < dir_el; ++i) {
-    // assemble path of file to read
-    char file_path[MAX_BUF_SIZE] = METRICS_DIR;
-    strcat(file_path, dir_content);
+    char file_name[MAX_BUF_SIZE];
+    char *metrics_string = "";
 
-    // read metrics, always skip header
-    readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
+    // Loop through the range of file indices
+    for (int i = start_index; i < start_index + num_files_to_read; ++i) {
+        // Manually create the file name
+        sprintf(file_name, "10101234560%02d_metrics.csv", i);
+        // printf("[Josh] Processing file: %s\n", file_name);
 
-    if (strlen(metrics_string) > 1) {
-      int metrics_size = strlen(metrics_string);
+        // Assemble the path of the file to read
+        char file_path[MAX_BUF_SIZE] = METRICS_DIR;
+        strcat(file_path, file_name);
+        printf("[Josh] Full file path: %s\n", file_path);
 
-      if (!(*send_metrics)) {
-        *send_metrics = (char*) calloc(metrics_size, sizeof(char*));
-        strcpy(*send_metrics, metrics_string);
-      }
-      else {
-        *send_metrics = (char*) realloc(*send_metrics, (strlen(*send_metrics) + metrics_size) * sizeof(char*));
-        memset(*send_metrics + curr_pos, '\0', metrics_size * sizeof(char*));
+        // Check if the file exists
+        FILE *file = fopen(file_path, "r");
+        if (file) {
+            fclose(file); // Close the file immediately after checking
 
-        strcat(*send_metrics, metrics_string);
-      }
+            // Allocate metrics_string before reading metrics
+            metrics_string = (char *)calloc(MAX_BUF_SIZE, sizeof(char));
+            if (!metrics_string) {
+                perror("Failed to allocate memory for metrics_string");
+                return;
+            }
 
-      curr_pos += metrics_size;
+            // Read metrics, always skip header
+            readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
 
-      free(metrics_string);
-      metrics_string = NULL;
+            if (strlen(metrics_string) > 1) {
+                int metrics_size = strlen(metrics_string);
+
+                if (!(*send_metrics)) {
+                    *send_metrics = (char*) calloc(metrics_size + 1, sizeof(char));
+                    if (!(*send_metrics)) {
+                        perror("Failed to allocate memory");
+                        free(metrics_string);
+                        return;
+                    }
+                    strcpy(*send_metrics, metrics_string);
+                }
+                else {
+                    char *temp = realloc(*send_metrics, (strlen(*send_metrics) + metrics_size + 1) * sizeof(char));
+                    if (!temp) {
+                        perror("Failed to reallocate memory for send_metrics");
+                        free(*send_metrics);
+                        *send_metrics = NULL;
+                        free(metrics_string);
+                        return;
+                    }
+                    *send_metrics = temp;
+                    strcat(*send_metrics, metrics_string);
+                }
+
+                curr_pos += metrics_size;
+
+                free(metrics_string);
+                metrics_string = NULL;
+            }
+        } else {
+            printf("[Josh] File does not exist: %s\n", file_path);
+        }
     }
-  }
 }
+
 
 
 // return current time in milliseconds since the EPOCH
