@@ -282,7 +282,7 @@ uint8_t BuildAndSendE2SetupReq()
          break;
       }
       /* Prints the Msg formed */
-      xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
+//      xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
 
       memset((uint8_t *)encBuf, 0, ENC_BUF_MAX_LEN);
       encBufSize = 0;
@@ -297,10 +297,10 @@ uint8_t BuildAndSendE2SetupReq()
       else
       {
          DU_LOG("\nE2AP : Created APER encoded buffer for E2SetupRequest\n");
-         for(int i=0; i< encBufSize; i++)
-         {
-            printf("%x",encBuf[i]);
-         }
+//         for(int i=0; i< encBufSize; i++)
+//         {
+//            printf("%x",encBuf[i]);
+//         }
       }
       if(SendE2APMsg(DU_APP_MEM_REGION, DU_POOL) != ROK)
       {
@@ -724,7 +724,7 @@ uint8_t BuildAndSendRicSubscriptionRsp()
 		  }
 
        /* Prints the Msg formed */
-        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apRicMsg);
+//        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apRicMsg);
 
         memset((uint8_t *)encBuf, 0, ENC_BUF_MAX_LEN);
         encBufSize = 0;
@@ -739,10 +739,10 @@ uint8_t BuildAndSendRicSubscriptionRsp()
         else
         {
             DU_LOG("\nE2AP : Created APER encoded buffer for RIC subscription response \n");
-	         for(int i=0; i< encBufSize; i++)
-	         {
-		          printf("%x",encBuf[i]);
-	         }
+//	         for(int i=0; i< encBufSize; i++)
+//	         {
+//		          printf("%x",encBuf[i]);
+//	         }
         }
 
         if(SendE2APMsg(DU_APP_MEM_REGION, DU_POOL) != ROK)
@@ -1383,7 +1383,7 @@ uint8_t BuildAndSendRicIndication()
 		      break;
 		  }
 		  /* Prints the Msg formed */
-        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
+//        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
         memset((uint8_t *)encBuf, 0, ENC_BUF_MAX_LEN);
 		  encBufSize = 0;
         encRetVal = aper_encode(&asn_DEF_E2AP_PDU, 0, e2apMsg, PrepFinalEncBuf,\
@@ -1397,10 +1397,10 @@ uint8_t BuildAndSendRicIndication()
         else
         {
            DU_LOG("\nE2AP : Created APER encoded buffer for RIC Indication Message \n");
-	        for(int i=0; i< encBufSize; i++)
-	        {
-		         printf("%x",encBuf[i]);
-	        }
+//	        for(int i=0; i< encBufSize; i++)
+//	        {
+//		         printf("%x",encBuf[i]);
+//	        }
         }
 
         if(SendE2APMsg(DU_APP_MEM_REGION, DU_POOL) != ROK)
@@ -1453,7 +1453,7 @@ uint8_t BuildAndSendRicIndicationReport(char* payload, int payload_len, uint32_t
 		      break;
 		  }
 		  /* Prints the Msg formed */
-        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
+//        xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
         memset((uint8_t *)encBuf, 0, ENC_BUF_MAX_LEN);
 		  encBufSize = 0;
         encRetVal = aper_encode(&asn_DEF_E2AP_PDU, 0, e2apMsg, PrepFinalEncBuf,\
@@ -1467,15 +1467,15 @@ uint8_t BuildAndSendRicIndicationReport(char* payload, int payload_len, uint32_t
         else
         {
            DU_LOG("\nE2AP : Created APER encoded buffer for RIC Indication Message \n");
-	        for(int i=0; i< encBufSize; i++)
-	        {
-		         printf("%x",encBuf[i]);
-	        }
+//	        for(int i=0; i< encBufSize; i++)
+//	        {
+//		         printf("%x",encBuf[i]);
+//	        }
         }
 
         if(SendE2APMsg(DU_APP_MEM_REGION, DU_POOL) == ROK)
         {
-          log_message((char*) payload, "report", payload_len);
+//          log_message((char*) payload, "report", payload_len);
           DU_LOG("\nE2AP : Sending RIC Indication Message");
         }
 		  ret = ROK;
@@ -1582,10 +1582,10 @@ void E2APMsgHdlr(Buffer *mBuf)
    }
 
    printf("\nE2AP : Received flat buffer to be decoded : ");
-   for(i=0; i< recvBufLen; i++)
-   {
-        printf("%x",recvBuf[i]);
-   }
+//   for(i=0; i< recvBufLen; i++)
+//   {
+//        printf("%x",recvBuf[i]);
+//   }
 
    /* Decoding flat buffer into E2AP messsage */
    e2apMsg = &e2apasnmsg;
@@ -1600,7 +1600,7 @@ void E2APMsgHdlr(Buffer *mBuf)
       return;
    }
    printf("\n");
-   xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
+//   xer_fprint(stdout, &asn_DEF_E2AP_PDU, e2apMsg);
 
    switch(e2apMsg->present)
    {
