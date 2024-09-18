@@ -156,7 +156,7 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
   append_string(&cmd, file_name);
   append_string(&cmd, " -ltr=");
   append_uint_to_str((unsigned int) to_read, cmd);
-  printf("[mau] Running cmd %s\n", cmd);
+//  printf("[mau] Running cmd %s\n", cmd);
 
 
   size_t valid_metrics = 0;
@@ -172,7 +172,7 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
       if (!(strcmp(buf, "\n") == 0)){
           append_string(output_string, buf);
           valid_metrics++;
-          printf("--> %s", buf);
+//          printf("--> %s", buf);
       }
 
   }
@@ -187,7 +187,7 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
       return -1;
   }
 
-  printf("[mau] valid_metrics %d\nTot. Return output: %s \n", valid_metrics, *output_string);
+//  printf("[mau] valid_metrics %d\nTot. Return output: %s \n", valid_metrics, *output_string);
 
 
   /*
@@ -298,7 +298,7 @@ void get_tx_string(char **send_metrics, int lines_to_read) {
         // Assemble the path of the file to read
         char file_path[MAX_BUF_SIZE] = METRICS_DIR;
         strcat(file_path, file_name);
-        printf("[Josh] Full file path: %s\n", file_path);
+//        printf("[Josh] Full file path: %s\n", file_path);
 
         // Check if the file exists
         FILE *file = fopen(file_path, "r");
@@ -346,7 +346,7 @@ void get_tx_string(char **send_metrics, int lines_to_read) {
                 metrics_string = NULL;
             }
         } else {
-            printf("[Josh] File does not exist: %s\n", file_path);
+//            printf("[Josh] File does not exist: %s\n", file_path);
         }
     }
 }
@@ -387,7 +387,7 @@ int csv_tester(void) {
   get_tx_string(&send_metrics, lines_to_read);
 
   if (send_metrics) {
-    printf("len %d\n%s", strlen(send_metrics), send_metrics);
+//    printf("len %d\n%s", strlen(send_metrics), send_metrics);
 
     // split if more than maximum payload for ric indication report
     if (strlen(send_metrics) > MAX_REPORT_PAYLOAD) {
@@ -407,7 +407,7 @@ int csv_tester(void) {
 
         strncpy(tmp_buf + offset, send_metrics + i, MAX_REPORT_PAYLOAD);
 
-        printf("Chunk\n%s\n\n", tmp_buf);
+//        printf("Chunk\n%s\n\n", tmp_buf);
       }
 
       free(tmp_buf);
