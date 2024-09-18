@@ -321,9 +321,9 @@ void write_control_policies(char* control_msg) {
                 printf("New policy is the same as last policy: %s\n", new_policy_array[i]);
             } else {
                 // Print the new policy instead of writing to files
-                printf("Debug: Would have written new policy %d: %s\n", i, new_policy_array[i]);
+                printf("Writing new policy %d: %s\n", i, new_policy_array[i]);
                 // Comment out actual file-writing functions for now:
-                // func_array[i](new_policy_array[i]);
+                func_array[i](new_policy_array[i]);
             }
         } else {
             // Handle missing policy
