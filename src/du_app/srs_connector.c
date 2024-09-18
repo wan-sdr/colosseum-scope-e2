@@ -303,7 +303,7 @@ void write_control_policies(char* control_msg) {
   char* policy = strtok(control, "\n");
   for (int i =0; policy != NULL; i++) {
     new_policy_array[i] = policy;
-    // printf("%s\n", policy);
+    printf("%s\n", policy);
     policy = strtok(NULL, "\n");
   }
 
