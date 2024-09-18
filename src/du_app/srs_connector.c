@@ -278,54 +278,69 @@ void write_gain_policy(char* new_gain) {
 }
 
 void write_control_policies(char* control_msg) {
-
-  // copy RIC control message so it can be modified
-  char *control = strdup(control_msg);
-  // Declare and initialize an array of functions
-  void (*func_array[]) (char *) = {write_scheduling_policy,
-                                    write_allocation_policy,
-                                    write_slice_policy,
-                                    write_mcs_policy,
-                                    write_gain_policy };
-  // Declare and initialize an array of last policies
-  char *last_policy_array[] = {last_scheduling_policy,
-                     last_allocation_policy,
-                     last_slice_policy,
-                     last_mcs_policy,
-                     last_gain_policy };
-  // Declare an array of new policies
-  char *new_policy_array[5] = {NULL, NULL, NULL, NULL, NULL};
-  // print RIC control message
-  printf_neat("\n==========Received RIC control message=========\n", control);
-
-  // tokenize RIC control message into policy strings
-  char* policy = strtok(control, "\n");
-  int index = 0;
-  while (policy != NULL && index < 5) {
-    new_policy_array[index] = policy;
-    printf("Parsed policy %d: %s\n", index, policy);  // Debugging print to confirm policy is received
-    policy = strtok(NULL, "\n");
-    index++;
-  }
-
-  // Iterate through all policy functions or until no tokens left in control message
-  for (int i = 0; i < 5; i++) {
-    // If policy exists and is different from last policy, print debug statement
-    if (new_policy_array[i] != NULL) {
-      if (strcmp(new_policy_array[i], last_policy_array[i]) == 0) {
-        printf("New policy is the same as last policy: %s\n", new_policy_array[i]);
-      } else {
-        // Print the new policy instead of writing to files
-        printf("Debug: Would have written new policy %d: %s\n", i, new_policy_array[i]);
-        // Comment out actual file-writing functions for now:
-        // func_array[i](new_policy_array[i]);
-      }
-    } else {
-      // Handle missing policy
-      printf("No policy provided for index %d\n", i);
+    // Copy RIC control message so it can be modified
+    char *control = strdup(control_msg);
+    if (control == NULL) {
+        DU_LOG("Memory allocation for control message failed");
+        return;
     }
-  }
+
+    // Declare and initialize an array of functions
+    void (*func_array[]) (char *) = {write_scheduling_policy,
+                                      write_allocation_policy,
+                                      write_slice_policy,
+                                      write_mcs_policy,
+                                      write_gain_policy };
+
+    // Declare and initialize an array of last policies
+    char *last_policy_array[] = {last_scheduling_policy,
+                                 last_allocation_policy,
+                                 last_slice_policy,
+                                 last_mcs_policy,
+                                 last_gain_policy };
+
+    // Declare an array of new policies
+    char *new_policy_array[5] = {NULL, NULL, NULL, NULL, NULL};
+
+    // Print RIC control message
+    printf_neat("\n==========Received RIC control message=========\n", control);
+
+    // Tokenize RIC control message into policy strings
+    char* policy = strtok(control, "\n");
+    int index = 0;
+
+    while (policy != NULL && index < 5) {
+        // Skip empty lines
+        if (strlen(policy) > 0) {
+            new_policy_array[index] = policy;
+            printf("Parsed policy %d: %s\n", index, policy);  // Debugging print to confirm policy is received
+            index++;
+        }
+        // Move to the next token
+        policy = strtok(NULL, "\n");
+    }
+
+    // Iterate through all policy functions or until no tokens left in control message
+    for (int i = 0; i < 5; i++) {
+        // If policy exists and is different from last policy, print debug statement
+        if (new_policy_array[i] != NULL) {
+            if (strcmp(new_policy_array[i], last_policy_array[i]) == 0) {
+                printf("New policy is the same as last policy: %s\n", new_policy_array[i]);
+            } else {
+                // Print the new policy instead of writing to files
+                printf("Debug: Would have written new policy %d: %s\n", i, new_policy_array[i]);
+                // Comment out actual file-writing functions for now:
+                // func_array[i](new_policy_array[i]);
+            }
+        } else {
+            // Handle missing policy
+            printf("No policy provided or empty line at index %d\n", i);
+        }
+    }
+
+    free(control);
 }
+
 
 int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
 
