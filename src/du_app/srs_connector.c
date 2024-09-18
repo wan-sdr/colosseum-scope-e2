@@ -278,12 +278,9 @@ void write_gain_policy(char* new_gain) {
 }
 
 void write_control_policies(char* control_msg) {
+
     // Copy RIC control message so it can be modified
     char *control = strdup(control_msg);
-    if (control == NULL) {
-        DU_LOG("Memory allocation for control message failed");
-        return;
-    }
 
     // Declare and initialize an array of functions
     void (*func_array[]) (char *) = {write_scheduling_policy,
@@ -310,14 +307,10 @@ void write_control_policies(char* control_msg) {
     int index = 0;
 
     while (policy != NULL && index < 5) {
-        // Skip empty lines
-        if (strlen(policy) > 0) {
-            new_policy_array[index] = policy;
-            printf("Parsed policy %d: %s\n", index, policy);  // Debugging print to confirm policy is received
-            index++;
-        }
-        // Move to the next token
+        new_policy_array[index] = policy;
+        printf("Parsed policy %d: %s\n", index, policy);  // Debugging print to confirm policy is received
         policy = strtok(NULL, "\n");
+        index++;
     }
 
     // Iterate through all policy functions or until no tokens left in control message
@@ -337,10 +330,7 @@ void write_control_policies(char* control_msg) {
             printf("No policy provided or empty line at index %d\n", i);
         }
     }
-
-    free(control);
 }
-
 
 int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
 
