@@ -282,23 +282,25 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
+    static int start_index = 2; // Static variable to remember the starting index across calls
     int curr_pos = 0;
     int num_files_to_read = 10; // Number of files to read
-    int start_index = 2; // Starting index for file names
 
     char file_name[MAX_BUF_SIZE];
     char *metrics_string = "";
 
     // Loop through the range of file indices
     for (int i = start_index; i < start_index + num_files_to_read; ++i) {
+        // Calculate file index, wrapping around after reaching 10
+        int file_index = (i - 2) % 10 + 2;  // File indices 02 to 11 wrapping around
+
         // Manually create the file name
-        sprintf(file_name, "10101234560%02d_metrics.csv", i);
-        // printf("[Josh] Processing file: %s\n", file_name);
+        sprintf(file_name, "10101234560%02d_metrics.csv", file_index);
+        printf("[Josh] Processing file: %s\n", file_name);
 
         // Assemble the path of the file to read
         char file_path[MAX_BUF_SIZE] = METRICS_DIR;
         strcat(file_path, file_name);
-//        printf("[Josh] Full file path: %s\n", file_path);
 
         // Check if the file exists
         FILE *file = fopen(file_path, "r");
@@ -346,9 +348,12 @@ void get_tx_string(char **send_metrics, int lines_to_read) {
                 metrics_string = NULL;
             }
         } else {
-//            printf("[Josh] File does not exist: %s\n", file_path);
+            // printf("[Josh] File does not exist: %s\n", file_path);
         }
     }
+
+    // Update start_index for the next function call, wrapping around from 11 back to 2
+    start_index = (start_index % 11) + 2;
 }
 
 
