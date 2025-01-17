@@ -151,12 +151,16 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
 
   char *cmd_prefix = "/root/radio_code/colosseum-scope-e2/src/du_app/readLastMetrics.o -csv=";
   char *cmd = (char*) malloc((strlen(cmd_prefix)+1)*sizeof(char));
+  if (cmd == NULL) {
+    perror("Failed to allocate memory for command");
+    return -1;
+  }
   strcpy(cmd, cmd_prefix);
 
   append_string(&cmd, file_name);
   append_string(&cmd, " -ltr=");
   append_uint_to_str((unsigned int) to_read, cmd);
-  printf("[mau] Running cmd %s\n", cmd);
+//  printf("[mau] Running cmd %s\n", cmd);
 
 
   size_t valid_metrics = 0;
@@ -164,7 +168,8 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
   FILE *p_fp;
 
   if ((p_fp = popen(cmd, "r")) == NULL) {
-      printf("Error opening pipe!\n");
+      perror("Error opening pipe");
+      free(cmd);
       return -1;
   }
 
@@ -172,7 +177,7 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
       if (!(strcmp(buf, "\n") == 0)){
           append_string(output_string, buf);
           valid_metrics++;
-          printf("--> %s", buf);
+//          printf("--> %s", buf);
       }
 
   }
@@ -184,31 +189,10 @@ void readLastMetricsLines(char *file_name, int to_read, char **output_string, in
 
   if (pclose(p_fp)) {
       printf("Command not found or exited with error status\n");
+      free(cmd);
       return -1;
   }
-
-  printf("[mau] valid_metrics %d\nTot. Return output: %s \n", valid_metrics, *output_string);
-
-
-  /*
-  if (valid_metrics < 1) {
-    printf("Freeing inside readLastMetricsLines\n");
-    if (strlen(*output_string) > 1){
-        free(*output_string);
-        *output_string = NULL;
-        printf("Freed\n");
-    }
-  }
-    //the following we don't need it (this is just to resize the buffer if less lines have been read, but in our case is allocated dynamically)
-
-  else if (valid_metrics < to_read) {
-    printf("Reallocating inside readLastMetricsLines\n");
-    // reallocate output_string accordingly
-    *output_string = (char*) realloc(*output_string, (strlen(*output_string) + 1) * sizeof(char*));
-    printf("[mau] output_string %d, after realloc %d\n", strlen(*output_string), (strlen(*output_string) + 1));
-    printf("Reallocated\n");
-  }
-  */
+  free(cmd);
 }
 
 
@@ -282,23 +266,26 @@ int getDirContent(char *directory_name, char (*dir_content)[MAX_BUF_SIZE]) {
 
 // read and assemble metrics to send
 void get_tx_string(char **send_metrics, int lines_to_read) {
+    static int start_index = 2; // Static variable to remember the starting index across calls
     int curr_pos = 0;
-    int num_files_to_read = 10; // Number of files to read
-    int start_index = 2; // Starting index for file names
+    int num_files_to_read = 3; // Set to read only a certain number of files at a time
+    int num_total_files = 10; // Total files to read from (02 to 11)
 
     char file_name[MAX_BUF_SIZE];
     char *metrics_string = "";
 
-    // Loop through the range of file indices
-    for (int i = start_index; i < start_index + num_files_to_read; ++i) {
+    // Loop through the number of files to read
+    for (int count = 0; count < num_files_to_read; ++count) {
+        // Calculate the current file index
+        int file_index = (start_index + count - 2) % num_total_files + 2; // File indices 02 to 11 wrapping around
+
         // Manually create the file name
-        sprintf(file_name, "10101234560%02d_metrics.csv", i);
-        // printf("[Josh] Processing file: %s\n", file_name);
+        sprintf(file_name, "10101234560%02d_metrics.csv", file_index);
+        printf("[Josh] Processing file: %s\n", file_name);
 
         // Assemble the path of the file to read
         char file_path[MAX_BUF_SIZE] = METRICS_DIR;
         strcat(file_path, file_name);
-        printf("[Josh] Full file path: %s\n", file_path);
 
         // Check if the file exists
         FILE *file = fopen(file_path, "r");
@@ -314,6 +301,9 @@ void get_tx_string(char **send_metrics, int lines_to_read) {
 
             // Read metrics, always skip header
             readLastMetricsLines(file_path, lines_to_read, &metrics_string, 1);
+            if (metrics_string == NULL) {
+                continue; // Skip processing if reading metrics fails
+            }
 
             if (strlen(metrics_string) > 1) {
                 int metrics_size = strlen(metrics_string);
@@ -349,7 +339,11 @@ void get_tx_string(char **send_metrics, int lines_to_read) {
             printf("[Josh] File does not exist: %s\n", file_path);
         }
     }
+
+    // Update start_index for the next function call, wrapping around from 11 back to 2
+    start_index = (start_index + num_files_to_read - 1) % num_total_files + 2; // Adjust start_index
 }
+
 
 
 
@@ -387,7 +381,7 @@ int csv_tester(void) {
   get_tx_string(&send_metrics, lines_to_read);
 
   if (send_metrics) {
-    printf("len %d\n%s", strlen(send_metrics), send_metrics);
+//    printf("len %d\n%s", strlen(send_metrics), send_metrics);
 
     // split if more than maximum payload for ric indication report
     if (strlen(send_metrics) > MAX_REPORT_PAYLOAD) {
@@ -407,7 +401,7 @@ int csv_tester(void) {
 
         strncpy(tmp_buf + offset, send_metrics + i, MAX_REPORT_PAYLOAD);
 
-        printf("Chunk\n%s\n\n", tmp_buf);
+//        printf("Chunk\n%s\n\n", tmp_buf);
       }
 
       free(tmp_buf);

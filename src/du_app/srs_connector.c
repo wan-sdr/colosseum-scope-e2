@@ -58,6 +58,7 @@ void write_scheduling_policy(char* new_scheduler) {
 
   fclose(fp);
   printf("Scheduler policy written to file: %s\n", filename);
+  free(scheduler_policies);
 }
 
 void write_allocation_policy(char* new_allocation){
@@ -72,6 +73,10 @@ void write_allocation_policy(char* new_allocation){
 
   // copy new_allocation so that it can be modified
   char* allocation_policies = strdup(new_allocation);
+  if (allocation_policies == NULL) {
+    printf("ERROR: Memory allocation failed for allocation_policies\n");
+    return;
+  }
 
   printf("Writing allocation policy: %s\n", new_allocation);
 
@@ -108,26 +113,18 @@ void write_allocation_policy(char* new_allocation){
     }
 
     int rbg_policy = atoi(rbg_policy_str);
-    char slicing_mask[rbg_num];
+    char slicing_mask[rbg_num + 1]; // +1 for null terminator
+    memset(slicing_mask, '0', rbg_num); // Initialize slicing_mask with '0's
+    slicing_mask[rbg_num] = '\0'; // Null-terminate the string
 
-    // initialize slicing mask values to NULL
-    for (int i = 0; i < rbg_num; ++i) {
-      slicing_mask[i] = '\0';
-    }
-
-    int m_idx;
-    for (m_idx = 0; m_idx < m_ptr; ++m_idx) {
-      strcat(slicing_mask, "0");
-    }
+    int m_idx = m_ptr;
 
     for (int i = 0; i < rbg_policy && m_idx < rbg_num; ++i, ++m_idx) {
-      strcat(slicing_mask, "1");
+        slicing_mask[m_idx] = '1';
     }
     m_ptr = m_idx;
 
-    for (; m_idx < rbg_num; ++m_idx) {
-      strcat(slicing_mask, "0");
-    }
+    // Remaining values should already be initialized to '0'
 
     printf("%s\n", slicing_mask);
 
@@ -136,6 +133,7 @@ void write_allocation_policy(char* new_allocation){
 
     if (fp == NULL) {
       printf("ERROR: fp is NULL\n");
+      free(allocation_policies);
       return;
     }
 
@@ -144,6 +142,7 @@ void write_allocation_policy(char* new_allocation){
     printf("Allocation policy written to file: %s\n", filename);
   }
   strcpy(last_allocation_policy, new_allocation);
+  free(allocation_policies);
 }
 
 void write_slice_policy(char* new_slice) {
@@ -159,8 +158,6 @@ void write_slice_policy(char* new_slice) {
 
   // copy new_slice so that it can be modified
   char* slice_policies = strdup(new_slice);
-
-
 
   printf("Writing slice policy: %s\n", new_slice);
 
@@ -192,6 +189,10 @@ void write_slice_policy(char* new_slice) {
   } else {
     printf("Failed to write slice policy to file: an error occurred.\n");
   }
+  fclose(fp);
+  free(new_policy);
+  free(slice_policies);
+  free(imsi);
 }
 
 void write_mcs_policy(char* new_mcs) {
@@ -240,6 +241,10 @@ void write_mcs_policy(char* new_mcs) {
   } else {
     printf("Failed to write MCS policy to file: an error occurred.\n");
   }
+  fclose(fp);
+  free(mcs_policies);
+  free(imsi);
+  free(new_policy);
 }
 
 void write_gain_policy(char* new_gain) {
@@ -275,52 +280,81 @@ void write_gain_policy(char* new_gain) {
   // close file
   fclose(fp);
   printf("Gain policy written to file: %s\n", filename);
+  free(gain);
 }
 
 void write_control_policies(char* control_msg) {
+    // Copy RIC control message so it can be modified
+    char *control = strdup(control_msg);
 
-  // copy RIC control message so it can be modified
-  char *control = strdup(control_msg);
-  // Declare and initialize an array of functions
-  void (*func_array[]) (char *) = {write_scheduling_policy,
-                                    write_allocation_policy,
-                                    write_slice_policy,
-                                    write_mcs_policy,
-                                    write_gain_policy };
-  // Declare and initialize an array of last policies
-  char *last_policy_array[] = {last_scheduling_policy,
-                     last_allocation_policy,
-                     last_slice_policy,
-                     last_mcs_policy,
-                     last_gain_policy };
-  // Declare an array of new policies
-  char *new_policy_array[5];
-  // print RIC control message
-  printf_neat("\n==========Received RIC control message=========\n", control);
+    // Declare and initialize an array of functions
+    void (*func_array[]) (char *) = {write_scheduling_policy,
+                                      write_allocation_policy,
+                                      write_slice_policy,
+                                      write_mcs_policy,
+                                      write_gain_policy };
 
-  // tokenize RIC control message into policy strings
-  //printf("\nWriting policies to config files...\n");
-  char* policy = strtok(control, "\n");
-  for (int i =0; policy != NULL; i++) {
-    new_policy_array[i] = policy;
-    // printf("%s\n", policy);
-    policy = strtok(NULL, "\n");
-  }
+    // Declare and initialize an array of last policies
+    char *last_policy_array[] = {last_scheduling_policy,
+                                 last_allocation_policy,
+                                 last_slice_policy,
+                                 last_mcs_policy,
+                                 last_gain_policy };
 
-  // Iterate through all policy functions or until no tokens left in control message
-  for (int i=0; i <= 4; i++) {
-    // If policy exists and different from last policy, write new policy
-    if (strcmp(new_policy_array[i], last_policy_array[i]) == 0) {
-      printf( "New policy is the same as last policy: %s, %s\n", new_policy_array[i], last_policy_array[i]);
-    } else if (new_policy_array[i] == NULL){
-      // TODO: cannot tokenize a NULL string between \n\n
-      printf("Skipping NULL policy\n");
-    } else {
-      printf("\n");
-      func_array[i](new_policy_array[i]);
+    // Print RIC control message
+    printf_neat("\n==========Received RIC control message=========\n", control);
+
+    // Tokenize RIC control message into separate messages using "END"
+    char* message = strtok(control, "END");
+
+    // Process each message
+    while (message != NULL) {
+        // Declare an array of new policies for the current message
+        char *new_policy_array[5] = {NULL, NULL, NULL, NULL, NULL};
+
+        // Tokenize each message into policies using newlines
+        char* policy = strtok(message, "\n");
+        int index = 0;
+
+        while (policy != NULL && index < 5) {
+            // Check if the policy is not just an empty string
+            if (strlen(policy) > 0) {
+                new_policy_array[index] = policy;
+                printf("Parsed policy %d: %s\n", index, policy);  // Debugging print to confirm policy is received
+            } else {
+                new_policy_array[index] = NULL;  // Empty field, set policy to NULL
+                printf("Parsed policy %d: (empty)\n", index);  // Debugging print for empty fields
+            }
+
+            policy = strtok(NULL, "\n");
+            index++;
+        }
+
+        // Iterate through all policy functions or until no tokens left in current message
+        for (int i = 0; i < 5; i++) {
+            // If policy exists and is different from last policy, print debug statement
+            if (new_policy_array[i] != NULL) {
+                if (strcmp(new_policy_array[i], last_policy_array[i]) == 0) {
+                    printf("New policy is the same as last policy: %s\n", new_policy_array[i]);
+                } else {
+                    // Print the new policy instead of writing to files
+                    printf("Writing new policy %d: %s\n", i, new_policy_array[i]);
+                    // Comment out actual file-writing functions for now:
+                    func_array[i](new_policy_array[i]);
+                }
+            } else {
+                // Handle missing policy
+                printf("No policy provided or empty line at index %d\n", i);
+            }
+        }
+
+        // Get the next message
+        message = strtok(NULL, "END");
     }
-  }
+
+    free(control);
 }
+
 
 int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
 
@@ -340,6 +374,7 @@ int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
     if (line == NULL) {
       fprintf(stderr, "Memory allocation failed\n");
       return 0;
+      free(line);
     }
 
     // copy number of chars specified the dynamically determined length
@@ -361,7 +396,6 @@ int write_imsi_line (FILE *fp, char *imsi, char *new_policy) {
     // If the line doesn't match the expected format, copy it as is
       fprintf(fp, "%s", line);
     }
-    free(line);
   }
   return updated;
 }
